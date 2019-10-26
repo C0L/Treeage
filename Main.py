@@ -12,10 +12,11 @@ FONT = "times"
 TEXT_SIZE = 10
 
 CIRCLE_SIZE = 2
-CIRCLE_WIDTH = 100
-CIRCLE_HEIGHT = 100
+START_RAD = 100
+DIST_START = 100 
+EPSILLON = .001
+SIZE_RATIO = (1/2)
 
-DIST_START = 50
 
 class GUI(Frame):
 
@@ -35,26 +36,32 @@ class GUI(Frame):
 
 class RNode():
 
-    def __init__(self, x, y, canvas, currDepth):
+    def __init__(self, x, y, radius, canvas, currDepth, indAngle):
         string = "test"
         self.canvas = canvas
         self.x = x 
         self.y = y 
-        self.filledAng = 0
+        self.indAngle = indAngle
         self.subNodes = []
         self.depth = currDepth
-        header = Label(canvas, text=string, fg="black", bg="white", 
-                font=("Helvetica, 16"))
-        header.place(x=self.x, y=self.y)
+        self.radius = radius
+        #header = Label(canvas, text=string, fg="black", bg="white", 
+         #       font=("Helvetica, 16"))
+
+        #canvas.update() 
+        #print ("ERR: " + str(header.winfo_width()))
+        #header.place(x = (self.x - (20)),
+        #             y = (self.y - (10)))
 
     def renderCircle(self):
         self.node = self.canvas.create_oval(
-                self.x - CIRCLE_WIDTH, self.y - CIRCLE_HEIGHT, 
-                self.x + CIRCLE_WIDTH, self.y + CIRCLE_HEIGHT, 
+                self.x - self.radius, self.y - self.radius, 
+                self.x + self.radius, self.y + self.radius, 
                 width=2)
 
-    def addSubNode(self, x, y, x0, y0, addNode, angle):
-        self.filledAng = angle
+    def addSubNode(self, x, y, x0, y0, addNode):
+        #print ("CURR ANLGLE IN ADD: " + str(currAngle))
+        #self.indAngle = currAngle
         self.line = self.canvas.create_line(x, y, x0, y0)
         self.subNodes.append(addNode) 
 
@@ -70,41 +77,98 @@ class RNodeCont():
         self.y = WINDOW_HEIGHT / 2
         self.canvas = canvas
 
-        self.recurseNum = 0
+#        self.recurseNum = 0
 
-        rNode = RNode(self.x, self.y, canvas, 0)
+        rNode = RNode(self.x, self.y, START_RAD, canvas, 0, 0)
         rNode.renderCircle()
-        self.recursiveDraw(rNode, DIST_START, 0)
+        self.generateRoot(rNode, DIST_START)
 
-    def recursiveDraw(self, currNode, distance, currDepth):
-        if (currNode.depth == 1):
-            return 
-        angle = 0
-        theta = angle+math.pi+((2*math.pi)/(self.ncount+1))
-        dangle=((2*math.pi)/self.ncount)
-        r = 100 
+    def generateRoot(self, currNode, distance):
+        currAngle = 0
+        deltaAngle = ((2 * math.pi) / self.ncount)
 
-        while angle < self.ncount*dangle:
-
-            addNode = RNode(currNode.x+(r+distance+r)*math.cos(angle), 
-                            currNode.y+(r+distance+r)*math.sin(angle), 
-                            self.canvas, currDepth)
+        # Full cirle
+        while currAngle < (2 * math.pi):
+            
+            addNode = RNode(currNode.x + (currNode.radius + distance +
+                            (currNode.radius * SIZE_RATIO)) * math.cos(currAngle),
+                            currNode.y + (currNode.radius + distance +
+                            (currNode.radius * SIZE_RATIO)) * math.sin(currAngle),
+                            (currNode.radius * SIZE_RATIO), 
+                            self.canvas, 1, currAngle)
+            
             addNode.renderCircle()
-            currNode.addSubNode(currNode.x+r*math.cos(angle), 
-                                currNode.y+r*math.sin(angle),
-                                currNode.x+(r+distance)*math.cos(angle),
-                                currNode.y+(r+distance)*math.sin(angle), 
-                                addNode, angle)
-            self.recursiveDraw(addNode, distance, currDepth + 1)
+            currNode.addSubNode(currNode.x + currNode.radius * 
+                                math.cos(currAngle),
+                                currNode.y + currNode.radius * 
+                                math.sin(currAngle),
+                                currNode.x + (currNode.radius + distance) 
+                                * math.cos(currAngle),
+                                currNode.y + (currNode.radius + distance) 
+                                * math.sin(currAngle), 
+                                addNode)
+        
+            #print ("GENROOT")        
+            self.generateRecursive(addNode, SIZE_RATIO * distance, 1)
             self.canvas.pack(fill=BOTH, expand=1)
-            angle+=dangle 
+            currAngle += deltaAngle 
+    
+    def generateRecursive(self, currNode, distance, currDepth):
+#        if (currNode.depth == 3):
+#            return 
+        
+        currNumNodes = self.ncount - currDepth
+        
+        if (currNumNodes == 1):
+            return
+
+        #print ("IND ANG: " + str(currNode.indAngle))        
+        currAngle = currNode.indAngle + math.pi + ((3 * math.pi) / 4)
+        deltaAngle = ((2 * math.pi) / (4 * (currNumNodes - 1)))
+        #print ("DCURR: " + str(deltaAngle))
+        #print ("QUANT: " + str((currNode.indAngle + math.pi + (4 * math.pi) /
+        #3)))
+
+        #print ("CURR: " + str(currAngle))
+        
+        while (currAngle <= 
+                ((currNode.indAngle + math.pi + (5 * math.pi) / 4) + EPSILLON)):
+            #print ("ENTERED ")            
+            
+            addNode = RNode(currNode.x + (currNode.radius + distance +
+                            (currNode.radius * SIZE_RATIO)) * math.cos(currAngle), 
+                            currNode.y + (currNode.radius + distance +
+                            (currNode.radius * SIZE_RATIO)) * math.sin(currAngle), 
+                            (currNode.radius * SIZE_RATIO), 
+                            self.canvas, currDepth, currAngle)
+             
+            addNode.renderCircle()
+            currNode.addSubNode(currNode.x + currNode.radius * 
+                                math.cos(currAngle),
+                                currNode.y + currNode.radius * 
+                                math.sin(currAngle),
+                                currNode.x + (currNode.radius + distance) 
+                                * math.cos(currAngle),
+                                currNode.y + (currNode.radius + distance) 
+                                * math.sin(currAngle), 
+                                addNode)
+            #print ("GENRECURSE: " + str(currAngle))        
+            self.generateRecursive(addNode, SIZE_RATIO * distance, currDepth + 1)
+            
+            #print ("CURR: " + str(currAngle))
+            #print ("QUANT: " + str((currNode.indAngle + math.pi + (4 * math.pi) / 3)))
+
+   
+            self.canvas.pack(fill=BOTH, expand=1)
+            currAngle += deltaAngle 
+
 
 def main():
     root = Tk()
     gui = GUI()
     canvas = gui.getCanvas()
     root.geometry(RESOLUTION)
-    main = RNodeCont(6, canvas) 
+    main = RNodeCont(4, canvas) 
     root.mainloop()
 
 if __name__ == '__main__':
