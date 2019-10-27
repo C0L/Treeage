@@ -2,6 +2,7 @@ from tkinter import *
 import scholarly
 import time
 import math
+from bs4 import BeautifulSoup
 
 #Constants
 RESOLUTION = "1920x1080"
@@ -38,8 +39,7 @@ class GUI(Frame):
 
 class RNode():
 
-    def __init__(self, x, y, radius, canvas, currDepth, indAngle, searchQuery=None):
-
+    def __init__(self, x, y, radius, canvas, currDepth, indAngle, pub = None):
         self.canvas = canvas
         self.x = x 
         self.y = y 
@@ -49,15 +49,26 @@ class RNode():
         self.radius = radius
         self.line = None
         self.leaf = True 
-
-        if (searchQuery != None):
-            self.searchQuery = searchQuery
-            string = searchQuery.citedby
-        else:
-            string = "No Value"
         
-        header = self.canvas.create_text(self.x, self.y, text=string,
+        if (pub != None):
+            self.pub = pub 
+            self.string = pub.citedby
+        else:
+            self.string = "None" 
+        
+        self.header = self.canvas.create_text(self.x, self.y, text = self.string,
                                          font=("Helvetica", 20 - (3 * currDepth)))
+            
+        absString = str(self.pub.bib['abstract'])
+
+        abstract = ("Title: " + self.pub.bib['title'] + "\n Author: " 
+              + self.pub.bib['author'] + " \n Abstract: " + absString)
+
+        self.wind = Label(canvas, borderwidth = 5, width=23, 
+            font='helvetica', text = abstract, wraplength = 200)
+
+
+
         canvas.update() 
 
     def renderCircle(self):
@@ -71,12 +82,32 @@ class RNode():
         self.line = self.canvas.create_line(x, y, x0, y0)
         self.subNodes.append(addNode) 
 
+    def resize(self, newRad):
+        oldRad = self.radius
+        self.radius = newRad
+        self.canvas.delete(self.node)
+        self.node = self.canvas.create_oval(
+                self.x + (self.radius - oldRad) * math.cos(self.indAngle) - self.radius,
+                self.y + (self.radius - oldRad) * math.sin(self.indAngle) - self.radius,
+                self.x + (self.radius-oldRad) * math.cos(self.indAngle)
+                +self.radius, self.y + (self.radius-oldRad) *
+                math.sin(self.indAngle) + self.radius, 
+                width=2)
+
+
+        self.x = self.x + (self.radius - oldRad) * math.cos(self.indAngle)
+        self.y = self.y + (self.radius - oldRad) * math.sin(self.indAngle)
+        
+        self.canvas.delete(self.header)
+        self.header = self.canvas.create_text(self.x, self.y, text=self.string,
+                                     font=("Helvetica", 20))
+        
+
     def updateNodePosition(self):
         coords = self.canvas.coords(self.node)
         self.x = (coords[0] + coords[2]) / 2
         self.y = (coords[1] + coords[3]) / 2
-        #print ("COORDS: " + str(self.canvas.coords(self.node)) + " vs " + str(self.x)
-        #+ " " + str(self.y))
+        self.wind.place_forget()
 
 class RNodeCont():
 
@@ -84,25 +115,32 @@ class RNodeCont():
         self.ncount = ncount
         self.x = WINDOW_WIDTH / 2
         self.y = WINDOW_HEIGHT / 2
-        self.searchQuery = RNodeCont.refByAuthor(author)
+
+        self.searchQuery = scholarly.search_author(author)
+        self.author = next(self.searchQuery).fill()
+        self.pub = self.author.publications[0].fill()
+        
         self.canvas = canvas
-        self.rNode = RNode(self.x, self.y, START_RAD, canvas, 0, 0, 
-                           self.searchQuery)
+        self.rNode = RNode(self.x, self.y, START_RAD, canvas, 0, 0, self.pub)
         self.rNode.renderCircle()
         self.generateRoot(self.rNode, DIST_START)
 
     def generateRoot(self, currNode, distance):
         currAngle = 0
         deltaAngle = ((2 * math.pi) / self.ncount)
-
+         
+        currCite = currNode.pub.get_citedby()
+        currPub = next(currCite)
+    
         # Full cirle
         while currAngle < (2 * math.pi):
+            #print (pubs[0]) 
             addNode = RNode(currNode.x + (currNode.radius + distance +
                             (currNode.radius * SIZE_RATIO)) * math.cos(currAngle),
                             currNode.y + (currNode.radius + distance +
                             (currNode.radius * SIZE_RATIO)) * math.sin(currAngle),
                             (currNode.radius * SIZE_RATIO), 
-                            self.canvas, 1, currAngle)
+                            self.canvas, 1, currAngle, currPub)
             
             addNode.renderCircle()
             currNode.addSubNode(currNode.x + currNode.radius * 
@@ -115,25 +153,30 @@ class RNodeCont():
                                 * math.sin(currAngle), 
                                 addNode)
         
+            currPub = next(currCite)
             self.generateRecursive(addNode, distance, 1)
             self.canvas.pack(fill=BOTH, expand=1)
             currAngle += deltaAngle 
-    
+
+
     def generateRecursive(self, currNode, distance, currDepth):
         currNumNodes = self.ncount - currDepth
         if (currNumNodes == 1):
             return
         
+        currCite = currNode.pub.get_citedby()
+        currPub = next(currCite)
+
         deltaAngle = 0.6 # 0.523
         currAngle = currNode.indAngle + (2*math.pi) - ((currNumNodes-1)*deltaAngle/2)
+        #count = 0
         for it in range(0, currNumNodes):
-#            print ("GENERATE")            
             addNode = RNode(currNode.x + (currNode.radius + distance +
-                            (currNode.radius * SIZE_RATIO)) * math.cos(currAngle), 
+                            (currNode.radius * SIZE_RATIO)) * math.cos(currAngle),
                             currNode.y + (currNode.radius + distance +
-                            (currNode.radius * SIZE_RATIO)) * math.sin(currAngle), 
+                            (currNode.radius * SIZE_RATIO)) * math.sin(currAngle),
                             (currNode.radius * SIZE_RATIO), 
-                            self.canvas, currDepth, currAngle)
+                            self.canvas, currDepth, currAngle, currPub)
              
             addNode.renderCircle()
             currNode.addSubNode(currNode.x + currNode.radius * 
@@ -145,10 +188,12 @@ class RNodeCont():
                                 currNode.y + (currNode.radius + distance) 
                                 * math.sin(currAngle), 
                                 addNode)
+            
+            currPub = next(currCite)
             self.generateRecursive(addNode, distance, currDepth + 1)
             self.canvas.pack(fill=BOTH, expand=1)
             currAngle += deltaAngle 
-    
+
     def selectNode(self, currNode, xIn, yIn):
         if ((currNode == self.rNode)  
             & RNodeCont.contains(currNode.x, currNode.y, currNode.radius, xIn,
@@ -165,33 +210,22 @@ class RNodeCont():
             self.selectNode(subNode, xIn, yIn)
 
     def contains(x1, y1, r, x0, y0):
-        #print ("BOUNDING BOX " + str(x0 >= (x - r)) + " " + str(x0 <= (x + r)) +
-        #" " + str(y0 >= (y - r)) + " " + str(y0 <= (y + r)))
-        #print ("")
         if (((x0 >= (x1 - r)) & (x0 <= (x1 + r))) 
             & ((y0 >= (y1 - r)) & (y0 <= (y1 + r)))): 
             return True 
         else:
             return False 
 
-    def scaleAll(self, currNode, scaleFac):
-        if (currNode == self.rNode):
-            pass
-            
-        for subNode in currNode.subNodes:
-            self.canvas.scale(subNode.node, scaleFac, scaleFac, subNode.radius,
-                              subNode.radius)
-            scaleAll(subNode, currNode)
-    
-
     def recenter(self, centerNode):
         deltaX = 960 - centerNode.x 
         deltaY = 540 - centerNode.y
         self.canvas.move(ALL, deltaX, deltaY) 
         self.updateAllPositions(self.rNode)
+        centerNode.wind.place(relx=1.0, rely=0.0, anchor='ne')
         if centerNode.leaf == True:
-            self.generateRecursive(centerNode, DIST_START, 0) 
-            self.scaleAll(self.rNode, 50, self.rNode.radius, self.rNode.radius)
+            centerNode.resize(START_RAD - 20)
+            self.generateRecursive(centerNode, DIST_START, 1) 
+
 
     def updateAllPositions(self, currNode):
         if (currNode == self.rNode):  
@@ -221,16 +255,14 @@ class EventHandler():
     def mouseClick(self, event):
         self.x = event.x
         self.y = event.y
-        print ("CLICK: " + str(self.x) + " " + str(self.y))
         self.cont.selectNode(self.cont.rNode, self.x, self.y)    
-        #self.cont.updateAllPositions(self.cont.rNode)
 
 def main():
     root = Tk()
     gui = GUI()
     canvas = gui.getCanvas()
     root.geometry(RESOLUTION)
-    author = "Marty Banks"
+    author = sys.argv[0]
     cont = RNodeCont(4, canvas, author) 
     ev = EventHandler(cont)
     canvas.bind("<Button-1>", ev.mouseClick)
@@ -238,23 +270,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
-
-
-#currAngle = currNode.indAngle + math.pi + ((3 * math.pi) / 4)
-
-#deltaAngle = ((2 * math.pi) / (4 * (currNumNodes - 1)))
-#print ("DCURR: " + str(deltaAngle))
-#print ("QUANT: " + str((currNode.indAngle + math.pi + (4 * math.pi) /
-#3)))
-
-#print ("CURR: " + str(currAngle))
-
-#while (currAngle <= 
-        #((currNode.indAngle + math.pi + (5 * math.pi) / 4) + EPSILLON)):
-    #print ("ENTERED ")            
-#while (currAngle <= currNode.indAngle + (2*math.pi) +
-#(currNumNodes*deltaAngle/2) + EPSILLON):
-
-
