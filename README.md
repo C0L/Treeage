@@ -10,3 +10,5 @@ Treeage is an infinitely expandable user experience that displays a root paper, 
   -> See the number of times that paper has been cited displayed in the center of each paper
 
 This was developed at SD Hacks 2019 with Mara Casebeer
+
+More information and graphics: https://devpost.com/software/treeage
