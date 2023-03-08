@@ -1,4 +1,4 @@
-# Triage
+# Treeage
 Treeage is an infinitely expandable user experience that displays a root paper, which can be found by searching the author:
   -> Search to find an author's most cited paper.
   -> From that root paper, branch out to see the most relevant papers that cite that root paper
